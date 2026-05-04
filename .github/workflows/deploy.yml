@@ -33,3 +33,38 @@ jobs:
         context: ./frontend-app
         push: true
         tags: ahmaddbutt/microservices-frontend:latest
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Deploy to AWS EC2
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SERVER_IP }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          # Create project directory if not exists
+          mkdir -p ~/app/kubernetes
+          cd ~/app
+          
+          # Pull latest images to avoid using old cache
+          docker pull ahmaddbutt/microservices-backend:latest
+          docker pull ahmaddbutt/microservices-frontend:latest
+          
+          # We need the kubernetes files on the server to apply them
+          # In a real scenario, you might git pull here too
+          # For now, we will create/copy them or assume they are there.
+          # Best practice: checkout the repo on the server too.
+          if [ ! -d ".git" ]; then
+            git clone https://github.com/ahmedbutt53/Microservices-Deployment-System.git .
+          else
+            git pull origin main
+          fi
+          
+          # Apply Kubernetes changes
+          minikube kubectl -- apply -f kubernetes/
